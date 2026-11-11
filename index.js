@@ -1,7 +1,7 @@
 /**
  * Host half of dsh-youtrack.
  *
- * - Links a Session to the first real YouTrack issue key in its first user message and titles it from the issue.
+ * - Links a Session to the first real YouTrack issue key in its first user message and titles it with the issue summary.
  * - Serves the issue facts (project, state, priority, colors) to the session list through `/api/youtrack`.
  * - Starts the YouTrack MCP server with the token from the credential store.
  *
@@ -38,6 +38,8 @@ export function apply(ctx, config) {
   /** sessionId -> key the session is linked to; sticks once set. */
   const links = new Map();
   const scans = new Map();
+  /** sessionId -> the title this plugin set last; tells our own title from one the user typed. */
+  const applied = new Map();
 
   const remember = (map, id, value) => {
     map.delete(id);
@@ -105,7 +107,10 @@ export function apply(ctx, config) {
     const titles = ctx.get('sessionTitle');
     if (!titles) return;
     try {
-      if (mayRetitle(titles.get(session), issue)) titles.rename(session, titleFor(issue));
+      if (!mayRetitle(titles.get(session), issue, applied.get(session.id))) return;
+      const title = titleFor(issue);
+      titles.rename(session, title);
+      remember(applied, session.id, title);
     } catch { /* a closing session or an invalid title must not break the feed */ }
   }
 
@@ -171,6 +176,7 @@ export function apply(ctx, config) {
 
   ctx.effect(() => ctx.on('session/disposed', (session) => {
     scans.delete(session.id);
+    applied.delete(session.id);
   }), 'dsh-youtrack: session cleanup');
 
   // --- browser endpoint

@@ -50,17 +50,23 @@ test('parseIssue drops hostile colors and rejects malformed input', () => {
   assert.equal(parseIssue({ idReadable: 'RW-1', summary: 's' }, 'https://h').state, undefined);
 });
 
-test('titleFor truncates long summaries', () => {
-  const issue = parseIssue({ ...raw, summary: 'x'.repeat(400) }, 'https://h');
-  assert.equal(titleFor(issue).length, 120);
-  assert.ok(titleFor(issue).endsWith('…'));
+test('titleFor is the summary alone and truncates long ones', () => {
+  const issue = parseIssue(raw, 'https://h');
+  assert.equal(titleFor(issue), 'Добавить на сайт schema.org');
+  const long = parseIssue({ ...raw, summary: 'x'.repeat(400) }, 'https://h');
+  assert.equal(titleFor(long).length, 120);
+  assert.ok(titleFor(long).endsWith('…'));
+  assert.equal(titleFor(parseIssue({ ...raw, summary: '   ' }, 'https://h')), 'RW-23112');
 });
 
 test('mayRetitle keeps a hand-typed title but follows our own', () => {
   const issue = parseIssue(raw, 'https://h');
+  const typed = { title: 'my own name', source: { kind: 'user' } };
   assert.equal(mayRetitle(undefined, issue), true);
   assert.equal(mayRetitle({ title: 'fix', source: { kind: 'fallback' } }, issue), true);
-  assert.equal(mayRetitle({ title: 'my own name', source: { kind: 'user' } }, issue), false);
-  assert.equal(mayRetitle({ title: 'RW-23112 Old summary', source: { kind: 'user' } }, issue), true);
+  assert.equal(mayRetitle(typed, issue), false);
+  assert.equal(mayRetitle(typed, issue, 'something else'), false);
+  assert.equal(mayRetitle({ title: 'Old summary', source: { kind: 'user' } }, issue, 'Old summary'), true);
   assert.equal(mayRetitle({ title: titleFor(issue), source: { kind: 'user' } }, issue), false);
+  assert.equal(mayRetitle({ title: 'RW-23112 Old summary', source: { kind: 'user' } }, issue), true);
 });

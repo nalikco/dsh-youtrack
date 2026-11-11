@@ -3,7 +3,7 @@
 YouTrack for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
 - **Links a session to an issue.** The first real issue key (`RW-23112`, `DL-4580`, …) in the session's **first user message** is verified against YouTrack and kept as the session's issue. Keys mentioned later, or by the assistant, are only mentions and never link the session. Words that only look like keys (`UTF-8`, `SHA-256`) are ignored because YouTrack answers 404 for them.
-- **Titles the session from the issue.** The session is renamed to `KEY Summary`. A title you typed yourself is never overwritten.
+- **Titles the session from the issue.** The session is renamed to the issue summary alone (the key is already shown in the list). A title you typed yourself is never overwritten; after an app restart a title this plugin set earlier is recognised only while it still matches the issue.
 - **Shows the issue in the session list.** A compact badge (project, state, and a priority marker in the colors YouTrack defines) sits at the end of the row; hovering the row shows project, state, priority and a link to the issue.
 - **Bundles the YouTrack MCP server.** Tools appear as `mcp__YouTrack__*`; no separate MCP entry is needed.
 
