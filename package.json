@@ -1,0 +1,67 @@
+{
+  "name": "dsh-youtrack",
+  "version": "0.1.0",
+  "description": "YouTrack for DeepSeek Harness: links sessions to issues, titles them from the issue, shows project, state and priority in the session list, and bundles the YouTrack MCP server.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Igor Karpliuk",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "youtrack",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nalikco/dsh-youtrack.git"
+  },
+  "engines": {
+    "node": ">=22",
+    "dsh": "^0.2.0-rc.2"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-ui-settings-general"
+      ]
+    }
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check client.js && node --check lib/issue.js",
+    "test": "node --test test/*.test.js"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "~3.18.4 || ~3.19.0",
+    "@deepseek-ai/dsh-mcp-client": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-mcp-client": {
+      "optional": true
+    }
+  }
+}

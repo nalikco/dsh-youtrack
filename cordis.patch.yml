@@ -1,0 +1,4 @@
+- insert:
+    - id: youtrack
+      name: dsh-youtrack
+      config: {}
