@@ -2,7 +2,7 @@
 
 YouTrack for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-- **Links a session to an issue.** The first real issue key (`RW-23112`, `DL-4580`, …) in any of the session's prompts is verified against YouTrack and kept as the session's issue. Words that only look like keys (`UTF-8`, `SHA-256`) are ignored because YouTrack answers 404 for them.
+- **Links a session to an issue.** The first real issue key (`RW-23112`, `DL-4580`, …) in the session's **first user message** is verified against YouTrack and kept as the session's issue. Keys mentioned later, or by the assistant, are only mentions and never link the session. Words that only look like keys (`UTF-8`, `SHA-256`) are ignored because YouTrack answers 404 for them.
 - **Titles the session from the issue.** The session is renamed to `KEY Summary`. A title you typed yourself is never overwritten.
 - **Shows the issue in the session list.** A compact badge (project, state, and a priority marker in the colors YouTrack defines) sits at the end of the row; hovering the row shows project, state, priority and a link to the issue.
 - **Bundles the YouTrack MCP server.** Tools appear as `mcp__YouTrack__*`; no separate MCP entry is needed.
@@ -31,7 +31,7 @@ If your agent presets list their plugins explicitly, remove their own YouTrack M
 
 - Without a token the plugin does nothing and makes no requests.
 - Issue data is cached for a minute and refreshed in the background for sessions visible in the list.
-- Only issue keys found in *user* prompts are considered.
+- Only the first user message is read; a session whose first message names no real issue stays unlinked.
 
 ## Development
 

@@ -1,7 +1,7 @@
 /**
  * Host half of dsh-youtrack.
  *
- * - Links a Session to the first real YouTrack issue key found in its user prompts and titles it from the issue.
+ * - Links a Session to the first real YouTrack issue key in its first user message and titles it from the issue.
  * - Serves the issue facts (project, state, priority, colors) to the session list through `/api/youtrack`.
  * - Starts the YouTrack MCP server with the token from the credential store.
  *
@@ -115,7 +115,7 @@ export function apply(ctx, config) {
     }
   }
 
-  // --- keys per session
+  // --- keys per session: only the FIRST user message counts; later mentions are just mentions.
   async function scan(sessionId) {
     const known = keysBySession.get(sessionId);
     if (known) return known;
@@ -123,15 +123,16 @@ export function apply(ctx, config) {
     if (pending) return pending;
     const job = (async () => {
       let keys = [];
+      let decided = false;
       try {
         const docs = await ctx.sessionQuery.filterEvents(sessionId, [
           { kind: 'type', values: ['user/message'] },
           { kind: 'surface', values: ['current'] },
         ]);
-        keys = candidateKeys(docs.map((d) => d.text || ''));
+        if (docs.length > 0) { keys = candidateKeys([docs[0].text || '']); decided = true; }
       } catch { /* an unreadable session simply has no link */ }
-      if (!keysBySession.has(sessionId)) remember(keysBySession, sessionId, keys);
-      return keysBySession.get(sessionId);
+      if (decided && !keysBySession.has(sessionId)) remember(keysBySession, sessionId, keys);
+      return keysBySession.get(sessionId) ?? keys;
     })().finally(() => scans.delete(sessionId));
     scans.set(sessionId, job);
     return job;
@@ -158,13 +159,12 @@ export function apply(ctx, config) {
 
   ctx.effect(() => ctx.on('session/event', (session, event) => {
     if (event.type !== 'user/message' || event.data?.source?.kind !== 'user') return;
+    if (keysBySession.has(session.id)) return; // the first message already decided this session
+    const earlier = session.snapshotEvents().some((e) => e.type === 'user/message' && e.data?.source?.kind === 'user' && e.seq < event.seq);
+    if (earlier) { void scan(session.id).then(() => issueOf(session.id)).catch(() => undefined); return; }
     const text = (event.data.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-    const found = candidateKeys([text]);
-    if (found.length === 0) return;
-    const keys = keysBySession.get(session.id) ?? [];
-    const merged = [...keys, ...found.filter((k) => !keys.includes(k))].slice(0, 5);
-    remember(keysBySession, session.id, merged);
-    if (!links.has(session.id)) void issueOf(session.id).catch(() => undefined);
+    remember(keysBySession, session.id, candidateKeys([text]));
+    void issueOf(session.id).catch(() => undefined);
   }), 'dsh-youtrack: session prompts');
 
   ctx.effect(() => ctx.on('session/disposed', (session) => {
