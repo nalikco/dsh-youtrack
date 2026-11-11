@@ -222,9 +222,9 @@ window.__ModuleLoader__.load({
         ctx.slots.inject('sidebar.session.row.hover', () => ctx.slots.register(
           { name: 'sidebar.session.row.hover', id: 'youtrack.row', order: 5, locale: NS },
           (props) => h(Hover, { store, sessionId: props.sessionId, t: props.t || t })));
-        ctx.slots.inject('settings.general.item', () => ctx.slots.register(
-          { name: 'settings.general.item', id: 'youtrack-token', order: 40 },
-          () => h(TokenRow, { ctx, t, store })));
+        ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register(
+          { name: 'plugins.bundle.config', key: 'dsh-youtrack' },
+          ({ view }) => (view === 'summary' ? t('settingsHint') : h(TokenRow, { ctx, t, store }))));
       },
     };
   },

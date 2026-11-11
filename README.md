@@ -11,7 +11,7 @@ YouTrack for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 
 In DSH open *Plugins* and install the bundle from GitHub: `github:nalikco/dsh-youtrack`.
 
-Then open **Settings → General → YouTrack**, paste a [permanent token](https://www.jetbrains.com/help/youtrack/server/manage-permanent-token.html) and press *Save*. The row reports whether YouTrack accepts it.
+Then open the **YouTrack** plugin page (*Plugins → YouTrack*), paste a [permanent token](https://www.jetbrains.com/help/youtrack/server/manage-permanent-token.html) and press *Save*. The row reports whether YouTrack accepts it.
 
 The token is stored in DSH's credential store under `YOUTRACK_TOKEN` (never in configuration files) and is used for both REST calls and the MCP server. Changing it restarts the MCP connection automatically.
 
