@@ -16,7 +16,7 @@ window.__ModuleLoader__.load({
       tokenSet: 'Token is set', tokenMissing: 'Token is not set', tokenPlaceholder: 'Paste a permanent token',
       save: 'Save', remove: 'Remove', saving: 'Saving…', saved: 'Saved', failed: 'Could not save the token.',
       readOnly: 'The credential store is read-only.', checking: 'Checking…',
-      authFailed: 'YouTrack rejected the token.', unreachable: 'YouTrack is unreachable.', connectedAs: 'Connected as {name}',
+      authFailed: 'YouTrack rejected the token.', unreachable: 'YouTrack is unreachable.', connected: 'Connected', account: 'Account', notConnected: 'Not connected', signOut: 'Disconnect',
     };
     const ru = {
       project: 'Проект', state: 'Состояние', priority: 'Срочность', open: 'Открыть в YouTrack', noValue: '—',
@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
       tokenSet: 'Токен задан', tokenMissing: 'Токен не задан', tokenPlaceholder: 'Вставьте постоянный токен',
       save: 'Сохранить', remove: 'Удалить', saving: 'Сохранение…', saved: 'Сохранено', failed: 'Не удалось сохранить токен.',
       readOnly: 'Хранилище секретов доступно только для чтения.', checking: 'Проверяю…',
-      authFailed: 'YouTrack отклонил токен.', unreachable: 'YouTrack недоступен.', connectedAs: 'Подключено: {name}',
+      authFailed: 'YouTrack отклонил токен.', unreachable: 'YouTrack недоступен.', connected: 'Подключён', account: 'Аккаунт', notConnected: 'Не подключён', signOut: 'Отключить',
     };
 
     const css = `
@@ -55,6 +55,17 @@ window.__ModuleLoader__.load({
 .yt-btn[data-primary]{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-3)}
 .yt-btn[data-primary]:hover:not(:disabled){background:var(--dsw-alias-label-primary);opacity:.9}
 .yt-btn:disabled{opacity:.4;cursor:not-allowed}
+.yt-card{display:flex;align-items:center;gap:16px;padding:16px 20px;border-radius:var(--dsw-radius-panel);border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2)}
+.yt-avatar{flex:none;width:44px;height:44px;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#79bef6,#5057d6);color:#fff;font-size:16px;font-weight:500}
+.yt-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.yt-card-body{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.yt-card-name{font-size:15px;line-height:22px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yt-card-sub{display:flex;align-items:center;gap:8px;font-size:13px;line-height:18px;color:var(--dsw-alias-label-secondary);min-width:0}
+.yt-card-sub span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yt-state-dot{flex:none;width:8px;height:8px;border-radius:2px;background:var(--dsw-alias-label-dimmed)}
+.yt-state-dot[data-tone=ok]{background:var(--dsw-alias-state-success-primary)}
+.yt-state-dot[data-tone=error]{background:var(--dsw-alias-state-error-primary)}
+.yt-btn.danger{border:.5px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-state-error-primary)}
 `;
 
     async function call(body) {
@@ -206,17 +217,24 @@ window.__ModuleLoader__.load({
       };
 
       let statusText = t('checking'); let tone = '';
-      if (info && !info.configured) statusText = t('tokenMissing');
+      if (info && !info.configured) statusText = t('notConnected');
       else if (info && check) {
-        if (check.status === 'ok') { statusText = t('connectedAs', { name: check.name || check.login || '' }); tone = 'ok'; }
+        if (check.status === 'ok') { statusText = `${t('connected')}${check.login ? ` · @${check.login}` : ''}`; tone = 'ok'; }
         else if (check.status === 'auth') { statusText = t('authFailed'); tone = 'error'; }
         else { statusText = t('unreachable'); tone = 'error'; }
-      } else if (info) statusText = t('tokenSet');
+      } else if (info) statusText = t('connected');
+      const person = check && check.status === 'ok' ? check : null;
+      const initials = person ? ([...(person.name || person.login || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => [...w][0])].join('').toUpperCase() || '?') : 'YT';
 
       return h('div', { className: 'yt-set' },
         h('style', null, css),
-        h('div', { className: 'yt-set-head' }, h('h3', { className: 'yt-set-title' }, t('settingsTitle')),
-          h('span', { className: 'yt-set-status', role: 'status', 'data-tone': tone }, statusText)),
+        h('h3', { className: 'yt-set-title' }, t('account')),
+        h('div', { className: 'yt-card' },
+          h('div', { className: 'yt-avatar', 'aria-hidden': true }, person?.avatar ? h('img', { src: person.avatar, alt: '' }) : initials),
+          h('div', { className: 'yt-card-body' },
+            h('div', { className: 'yt-card-name' }, person ? (person.name || person.login) : t('settingsTitle')),
+            h('div', { className: 'yt-card-sub', role: 'status' }, h('span', { className: 'yt-state-dot', 'data-tone': tone }), h('span', null, statusText))),
+          info?.configured && info.writable !== false && h('button', { className: 'yt-btn danger', type: 'button', disabled: busy, onClick: clear }, t('signOut'))),
         h('p', { className: 'yt-set-hint' }, t('settingsHint')),
         h('label', { className: 'yt-set-label' }, t('hostLabel')),
         h('form', { className: 'yt-set-form', onSubmit: saveHost },
@@ -229,7 +247,7 @@ window.__ModuleLoader__.load({
           : h('form', { className: 'yt-set-form', onSubmit: save },
             h('input', { className: 'yt-input', type: 'password', autoComplete: 'off', spellCheck: false, 'aria-label': t('settingsTitle'), placeholder: t('tokenPlaceholder'), value, disabled: busy, onChange: (e) => { setValue(e.target.value); setMessage(''); } }),
             h('button', { className: 'yt-btn', type: 'submit', 'data-primary': true, disabled: busy || !value.trim() }, t(busy ? 'saving' : 'save')),
-            info?.configured && h('button', { className: 'yt-btn', type: 'button', disabled: busy, onClick: clear }, t('remove'))),
+            ),
         message && h('span', { className: 'yt-set-status', role: 'status' }, message));
     }
 

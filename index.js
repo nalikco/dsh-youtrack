@@ -24,6 +24,8 @@ const FAILED_MS = 30_000;
 const REQUEST_MS = 10_000;
 const MAX_SESSIONS = 200;
 const MAX_REMEMBERED = 1000;
+const MAX_AVATAR_BYTES = 256 * 1024;
+const AVATAR_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 export function apply(ctx, config) {
   const rawHost = () => (typeof config.baseUrl?.get === 'function' ? config.baseUrl.get() : config.baseUrl);
@@ -180,6 +182,40 @@ export function apply(ctx, config) {
   }), 'dsh-youtrack: session cleanup');
 
   // --- browser endpoint
+  /**
+   * The profile picture as a data URL, or undefined. YouTrack answers with a redirect to an avatar service: the token is
+   * sent only to the YouTrack host, the redirect target is fetched without it, and only a small image is accepted.
+   */
+  const avatars = new Map();
+  async function avatar(path) {
+    if (typeof path !== 'string' || !path.startsWith('/')) return undefined;
+    const base = host();
+    const cached = avatars.get(`${base}${path}`);
+    if (cached && Date.now() - cached.at < 10 * 60_000) return cached.url;
+    let url;
+    try {
+      const secret = await token();
+      const first = await fetch(`${base}${path.includes('?') ? path.replace(/s=\d+/, 's=96') : `${path}?s=96`}`, {
+        headers: secret ? { Authorization: `Bearer ${secret}` } : {}, redirect: 'manual', signal: AbortSignal.timeout(REQUEST_MS),
+      });
+      let response = first;
+      const next = first.headers.get('location');
+      if (first.status >= 300 && first.status < 400 && next) {
+        const target = new URL(next, base);
+        if (target.protocol !== 'https:' && target.protocol !== 'http:') return undefined;
+        response = await fetch(target, { redirect: 'follow', signal: AbortSignal.timeout(REQUEST_MS) });
+      }
+      const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+      if (response.ok && AVATAR_TYPES.has(type)) {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.length > 0 && bytes.length <= MAX_AVATAR_BYTES) url = `data:${type};base64,${bytes.toString('base64')}`;
+      }
+    } catch { /* no picture: the card falls back to initials */ }
+    avatars.set(`${base}${path}`, { url, at: Date.now() });
+    if (avatars.size > 20) avatars.delete(avatars.keys().next().value);
+    return url;
+  }
+
   const descriptor = () => {
     const bare = ctx.fiber.entry.options.id.replace(/^include:/, '');
     const row = ctx.settings.describe().find((r) => r.ns === bare || r.ns === `include:${bare}`);
@@ -205,13 +241,20 @@ export function apply(ctx, config) {
       if (!Number.isInteger(body.revision)) throw new Error('Read the settings revision before saving');
       await ctx.settings.update(descriptor().ns, { baseUrl: next }, body.revision);
       issues.clear();
+      avatars.clear();
       mcp?.restart();
       return { baseUrl: host(), revision: descriptor().revision };
     }
     if (body?.action === 'status') {
-      const result = await api('users/me?fields=login,name');
+      const result = await api('users/me?fields=login,name,fullName,avatarUrl');
       if (result.status !== 'ok') return { status: result.status };
-      return { status: 'ok', login: String(result.json?.login ?? ''), name: String(result.json?.name ?? '') };
+      const me = result.json ?? {};
+      return {
+        status: 'ok',
+        login: String(me.login ?? ''),
+        name: String(me.fullName ?? me.name ?? ''),
+        avatar: await avatar(me.avatarUrl),
+      };
     }
     if (body?.action !== 'issues' || !Array.isArray(body.sessionIds)) throw new Error('Unknown action');
     if (!(await token())) return { status: 'no-token', issues: {} };
