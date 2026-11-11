@@ -11,7 +11,8 @@ window.__ModuleLoader__.load({
 
     const en = {
       project: 'Project', state: 'State', priority: 'Priority', open: 'Open in YouTrack', noValue: '—',
-      settingsTitle: 'YouTrack', settingsHint: 'Access token for YouTrack. It links sessions to issues, titles them and starts the YouTrack MCP server. Create a permanent token in your YouTrack profile.',
+      hostLabel: 'YouTrack address', hostPlaceholder: 'https://example.youtrack.cloud', tokenLabel: 'Access token', hostSaved: 'Address saved', hostFailed: 'Could not save the address.',
+      settingsTitle: 'YouTrack', settingsHint: 'Address and access token for YouTrack. It links sessions to issues, titles them and starts the YouTrack MCP server. Create a permanent token in your YouTrack profile.',
       tokenSet: 'Token is set', tokenMissing: 'Token is not set', tokenPlaceholder: 'Paste a permanent token',
       save: 'Save', remove: 'Remove', saving: 'Saving…', saved: 'Saved', failed: 'Could not save the token.',
       readOnly: 'The credential store is read-only.', checking: 'Checking…',
@@ -19,7 +20,8 @@ window.__ModuleLoader__.load({
     };
     const ru = {
       project: 'Проект', state: 'Состояние', priority: 'Срочность', open: 'Открыть в YouTrack', noValue: '—',
-      settingsTitle: 'YouTrack', settingsHint: 'Токен доступа к YouTrack. Связывает сессии с задачами, берёт из них названия и запускает MCP-сервер YouTrack. Постоянный токен создаётся в профиле YouTrack.',
+      hostLabel: 'Адрес YouTrack', hostPlaceholder: 'https://example.youtrack.cloud', tokenLabel: 'Токен доступа', hostSaved: 'Адрес сохранён', hostFailed: 'Не удалось сохранить адрес.',
+      settingsTitle: 'YouTrack', settingsHint: 'Адрес и токен доступа к YouTrack. Связывает сессии с задачами, берёт из них названия и запускает MCP-сервер YouTrack. Постоянный токен создаётся в профиле YouTrack.',
       tokenSet: 'Токен задан', tokenMissing: 'Токен не задан', tokenPlaceholder: 'Вставьте постоянный токен',
       save: 'Сохранить', remove: 'Удалить', saving: 'Сохранение…', saved: 'Сохранено', failed: 'Не удалось сохранить токен.',
       readOnly: 'Хранилище секретов доступно только для чтения.', checking: 'Проверяю…',
@@ -44,6 +46,7 @@ window.__ModuleLoader__.load({
 .yt-set-status{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .yt-set-status[data-tone=ok]{color:var(--dsw-alias-state-success-primary)}
 .yt-set-status[data-tone=error]{color:var(--dsw-alias-state-error-primary)}
+.yt-set-label{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .yt-set-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .yt-input{flex:1;min-width:200px;height:32px;padding:0 10px;box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}
 .yt-input:focus{border-color:var(--dsw-alias-state-business-primary)}
@@ -155,6 +158,20 @@ window.__ModuleLoader__.load({
       const [value, setValue] = React.useState('');
       const [busy, setBusy] = React.useState(false);
       const [message, setMessage] = React.useState('');
+      const [cfg, setCfg] = React.useState(null); // { baseUrl, revision }
+      const [host, setHost] = React.useState('');
+      const [hostMessage, setHostMessage] = React.useState('');
+      const loadConfig = React.useCallback(() => call({ action: 'config' }).then((c) => { setCfg(c); setHost(c.baseUrl); }).catch(() => undefined), []);
+      React.useEffect(() => { loadConfig(); }, [loadConfig]);
+      const saveHost = async (event) => {
+        event.preventDefault();
+        setBusy(true); setHostMessage('');
+        try {
+          const c = await call({ action: 'set-host', baseUrl: host, revision: cfg.revision });
+          setCfg(c); setHost(c.baseUrl); setHostMessage(t('hostSaved')); store.reload();
+          setCheck(null); call({ action: 'status' }).then(setCheck).catch(() => setCheck({ status: 'error' }));
+        } catch (error) { setHostMessage(`${t('hostFailed')} ${error.message || ''}`.trim()); loadConfig(); } finally { setBusy(false); }
+      };
 
       const read = React.useCallback(async () => {
         const response = await ctx.remote.credentials.describe([TOKEN_REF]);
@@ -201,6 +218,12 @@ window.__ModuleLoader__.load({
         h('div', { className: 'yt-set-head' }, h('h3', { className: 'yt-set-title' }, t('settingsTitle')),
           h('span', { className: 'yt-set-status', role: 'status', 'data-tone': tone }, statusText)),
         h('p', { className: 'yt-set-hint' }, t('settingsHint')),
+        h('label', { className: 'yt-set-label' }, t('hostLabel')),
+        h('form', { className: 'yt-set-form', onSubmit: saveHost },
+          h('input', { className: 'yt-input', type: 'url', autoComplete: 'off', spellCheck: false, 'aria-label': t('hostLabel'), placeholder: t('hostPlaceholder'), value: host, disabled: busy || !cfg, onChange: (e) => { setHost(e.target.value); setHostMessage(''); } }),
+          h('button', { className: 'yt-btn', type: 'submit', 'data-primary': true, disabled: busy || !cfg || !host.trim() || host.trim().replace(/\/+$/, '') === cfg.baseUrl }, t('save'))),
+        hostMessage && h('span', { className: 'yt-set-status', role: 'status' }, hostMessage),
+        h('label', { className: 'yt-set-label' }, t('tokenLabel')),
         info && info.writable === false
           ? h('p', { className: 'yt-set-status', 'data-tone': 'error' }, t('readOnly'))
           : h('form', { className: 'yt-set-form', onSubmit: save },

@@ -10,11 +10,11 @@
 import z from '@deepseek-ai/schemastery';
 import { candidateKeys, ISSUE_FIELDS, mayRetitle, parseIssue, titleFor } from './lib/issue.js';
 
-export const inject = ['connection', 'credentials', 'sessionQuery', 'sessions'];
+export const inject = ['connection', 'credentials', 'sessionQuery', 'sessions', 'settings'];
 
 export const TOKEN_REF = 'YOUTRACK_TOKEN';
 export const Config = z.object({
-  baseUrl: z.string().default('https://xlab.youtrack.cloud').description('YouTrack base URL, without a trailing slash.'),
+  baseUrl: z.string().default('https://xlab.youtrack.cloud').description('YouTrack base URL, without a trailing slash.').volatile(),
   mcp: z.boolean().default(true).description('Start the YouTrack MCP server (tools named mcp__YouTrack__*).'),
 });
 
@@ -26,7 +26,9 @@ const MAX_SESSIONS = 200;
 const MAX_REMEMBERED = 1000;
 
 export function apply(ctx, config) {
-  const baseUrl = config.baseUrl.replace(/\/+$/, '');
+  const rawHost = () => (typeof config.baseUrl?.get === 'function' ? config.baseUrl.get() : config.baseUrl);
+  /** Current base URL; read on every use because the setting changes live. */
+  const host = () => String(rawHost()).replace(/\/+$/, '');
 
   /** key -> { issue: Issue | null, at, ttl, status } */
   const issues = new Map();
@@ -53,7 +55,7 @@ export function apply(ctx, config) {
     const secret = await token();
     if (!secret) return { status: 'no-token' };
     try {
-      const response = await fetch(`${baseUrl}/api/${path}`, {
+      const response = await fetch(`${host()}/api/${path}`, {
         headers: { Authorization: `Bearer ${secret}`, Accept: 'application/json' },
         signal: AbortSignal.any([AbortSignal.timeout(REQUEST_MS), ...(signal ? [signal] : [])]),
       });
@@ -74,7 +76,7 @@ export function apply(ctx, config) {
       const result = await api(`issues/${encodeURIComponent(key)}?fields=${encodeURIComponent(ISSUE_FIELDS)}`);
       const now = Date.now();
       if (result.status === 'ok') {
-        const issue = parseIssue(result.json, baseUrl) ?? null;
+        const issue = parseIssue(result.json, host()) ?? null;
         issues.set(key, { issue, at: now, ttl: issue ? FRESH_MS : NOT_ISSUE_MS, status: 'ok' });
         if (issue) retitleLinked(issue);
       } else if (result.status === 'missing') {
@@ -172,7 +174,34 @@ export function apply(ctx, config) {
   }), 'dsh-youtrack: session cleanup');
 
   // --- browser endpoint
+  const descriptor = () => {
+    const bare = ctx.fiber.entry.options.id.replace(/^include:/, '');
+    const row = ctx.settings.describe().find((r) => r.ns === bare || r.ns === `include:${bare}`);
+    if (!row) throw new Error('Plugin settings are unavailable');
+    return row;
+  };
+
+  /** A usable base URL or a thrown reason; only http(s) origins (optionally with a path) are accepted. */
+  function checkHost(value) {
+    if (typeof value !== 'string') throw new Error('Host must be a string');
+    const text = value.trim().replace(/\/+$/, '');
+    let url;
+    try { url = new URL(text); } catch { throw new Error('Enter a full URL, for example https://example.youtrack.cloud'); }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Only http and https URLs are supported');
+    if (url.search || url.hash || url.username || url.password) throw new Error('The URL must not contain a query, fragment or credentials');
+    return text;
+  }
+
   async function operate(body) {
+    if (body?.action === 'config') return { baseUrl: host(), revision: descriptor().revision };
+    if (body?.action === 'set-host') {
+      const next = checkHost(body.baseUrl);
+      if (!Number.isInteger(body.revision)) throw new Error('Read the settings revision before saving');
+      await ctx.settings.update(descriptor().ns, { baseUrl: next }, body.revision);
+      issues.clear();
+      mcp?.restart();
+      return { baseUrl: host(), revision: descriptor().revision };
+    }
     if (body?.action === 'status') {
       const result = await api('users/me?fields=login,name');
       if (result.status !== 'ok') return { status: result.status };
@@ -195,6 +224,8 @@ export function apply(ctx, config) {
     return { status, issues: out };
   }
 
+  let mcp;
+  ctx.effect(() => ctx.settings.configure({ auto: false }), 'dsh-youtrack: settings page policy');
   ctx.effect(() => ctx.connection.fetch.register({
     path: '/api/youtrack',
     methods: ['POST'],
@@ -209,11 +240,11 @@ export function apply(ctx, config) {
   }), 'dsh-youtrack: endpoint');
 
   // --- MCP server (tools mcp__YouTrack__*)
-  if (config.mcp) startMcp(ctx, baseUrl, token);
+  if (config.mcp) mcp = startMcp(ctx, host, token);
 }
 
 /** Run the MCP client with the stored token and restart it whenever the token changes. */
-function startMcp(ctx, baseUrl, token) {
+function startMcp(ctx, host, token) {
   let fiber;
   let generation = 0;
   let closed = false;
@@ -235,7 +266,7 @@ function startMcp(ctx, baseUrl, token) {
       fiber = ctx.plugin(mcp, {
         serverName: 'YouTrack',
         transport: 'streamable-http',
-        url: `${baseUrl}/mcp`,
+        url: `${host()}/mcp`,
         headers: { Authorization: `Bearer ${secret}` },
         failOnStartupError: false,
       });
@@ -254,4 +285,5 @@ function startMcp(ctx, baseUrl, token) {
     generation++;
     return stop();
   }, 'dsh-youtrack: mcp');
+  return { restart: () => void start() };
 }
