@@ -16,7 +16,7 @@ window.__ModuleLoader__.load({
       tokenSet: 'Token is set', tokenMissing: 'Token is not set', tokenPlaceholder: 'Paste a permanent token',
       save: 'Save', remove: 'Remove', saving: 'Saving…', saved: 'Saved', failed: 'Could not save the token.',
       readOnly: 'The credential store is read-only.', checking: 'Checking…',
-      authFailed: 'YouTrack rejected the token.', unreachable: 'YouTrack is unreachable.', connected: 'Connected', account: 'Account', notConnected: 'Not connected', signOut: 'Disconnect',
+      authFailed: 'YouTrack rejected the token.', noHost: 'Enter the YouTrack address below.', unreachable: 'YouTrack is unreachable.', connected: 'Connected', account: 'Account', notConnected: 'Not connected', signOut: 'Disconnect',
     };
     const ru = {
       project: 'Проект', state: 'Состояние', priority: 'Срочность', open: 'Открыть в YouTrack', noValue: '—',
@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
       tokenSet: 'Токен задан', tokenMissing: 'Токен не задан', tokenPlaceholder: 'Вставьте постоянный токен',
       save: 'Сохранить', remove: 'Удалить', saving: 'Сохранение…', saved: 'Сохранено', failed: 'Не удалось сохранить токен.',
       readOnly: 'Хранилище секретов доступно только для чтения.', checking: 'Проверяю…',
-      authFailed: 'YouTrack отклонил токен.', unreachable: 'YouTrack недоступен.', connected: 'Подключён', account: 'Аккаунт', notConnected: 'Не подключён', signOut: 'Отключить',
+      authFailed: 'YouTrack отклонил токен.', noHost: 'Укажите адрес YouTrack ниже.', unreachable: 'YouTrack недоступен.', connected: 'Подключён', account: 'Аккаунт', notConnected: 'Не подключён', signOut: 'Отключить',
     };
 
     const css = `
@@ -220,6 +220,7 @@ window.__ModuleLoader__.load({
       if (info && !info.configured) statusText = t('notConnected');
       else if (info && check) {
         if (check.status === 'ok') { statusText = `${t('connected')}${check.login ? ` · @${check.login}` : ''}`; tone = 'ok'; }
+        else if (check.status === 'no-host') { statusText = t('noHost'); tone = 'error'; }
         else if (check.status === 'auth') { statusText = t('authFailed'); tone = 'error'; }
         else { statusText = t('unreachable'); tone = 'error'; }
       } else if (info) statusText = t('connected');

@@ -21,7 +21,7 @@ The token is stored in DSH's credential store under `YOUTRACK_TOKEN` (never in c
 - id: youtrack
   name: dsh-youtrack
   config:
-    baseUrl: https://example.youtrack.cloud   # default: https://xlab.youtrack.cloud (also editable on the plugin page)
+    baseUrl: https://example.youtrack.cloud   # required; also editable on the plugin page
     mcp: true                                  # set false to skip the MCP server
 ```
 
@@ -29,7 +29,7 @@ If your agent presets list their plugins explicitly, remove their own YouTrack M
 
 ## Notes
 
-- Without a token the plugin does nothing and makes no requests.
+- Without an address and a token the plugin does nothing and makes no requests.
 - Issue data is cached for a minute and refreshed in the background for sessions visible in the list.
 - Only the first user message is read; a session whose first message names no real issue stays unlinked.
 

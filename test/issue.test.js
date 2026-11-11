@@ -33,12 +33,12 @@ const raw = {
 };
 
 test('parseIssue builds the browser view with YouTrack colors', () => {
-  const issue = parseIssue(raw, 'https://xlab.youtrack.cloud/');
+  const issue = parseIssue(raw, 'https://example.youtrack.cloud/');
   assert.equal(issue.key, 'RW-23112');
   assert.deepEqual(issue.project, { key: 'RW', name: 'Rosewood' });
   assert.deepEqual(issue.state, { name: 'In progress', bg: '#cce5ff', fg: '#003d7a' });
   assert.deepEqual(issue.priority, { name: 'During the day', bg: '#e6007a', fg: '#fff' });
-  assert.equal(issue.url, 'https://xlab.youtrack.cloud/issue/RW-23112');
+  assert.equal(issue.url, 'https://example.youtrack.cloud/issue/RW-23112');
 });
 
 test('parseIssue drops hostile colors and rejects malformed input', () => {

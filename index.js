@@ -14,7 +14,7 @@ export const inject = ['connection', 'credentials', 'sessionQuery', 'sessions', 
 
 export const TOKEN_REF = 'YOUTRACK_TOKEN';
 export const Config = z.object({
-  baseUrl: z.string().default('https://xlab.youtrack.cloud').description('YouTrack base URL, without a trailing slash.').volatile(),
+  baseUrl: z.string().default('').description('YouTrack base URL, without a trailing slash, for example https://example.youtrack.cloud.').volatile(),
   mcp: z.boolean().default(true).description('Start the YouTrack MCP server (tools named mcp__YouTrack__*).'),
 });
 
@@ -30,7 +30,7 @@ const AVATAR_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gi
 export function apply(ctx, config) {
   const rawHost = () => (typeof config.baseUrl?.get === 'function' ? config.baseUrl.get() : config.baseUrl);
   /** Current base URL; read on every use because the setting changes live. */
-  const host = () => String(rawHost()).replace(/\/+$/, '');
+  const host = () => String(rawHost() ?? '').trim().replace(/\/+$/, '');
 
   /** key -> { issue: Issue | null, at, ttl, status } */
   const issues = new Map();
@@ -56,6 +56,7 @@ export function apply(ctx, config) {
   };
 
   async function api(path, signal) {
+    if (!host()) return { status: 'no-host' };
     const secret = await token();
     if (!secret) return { status: 'no-token' };
     try {
@@ -85,7 +86,7 @@ export function apply(ctx, config) {
         if (issue) retitleLinked(issue);
       } else if (result.status === 'missing') {
         issues.set(key, { issue: null, at: now, ttl: NOT_ISSUE_MS, status: 'ok' });
-      } else if (result.status !== 'no-token') {
+      } else if (result.status !== 'no-token' && result.status !== 'no-host') {
         // Keep the last good issue on a transient failure; remember only that the attempt failed.
         const previous = issues.get(key);
         issues.set(key, { issue: previous?.issue ?? null, at: now, ttl: FAILED_MS, status: result.status });
@@ -257,6 +258,7 @@ export function apply(ctx, config) {
       };
     }
     if (body?.action !== 'issues' || !Array.isArray(body.sessionIds)) throw new Error('Unknown action');
+    if (!host()) return { status: 'no-host', issues: {} };
     if (!(await token())) return { status: 'no-token', issues: {} };
     const ids = [...new Set(body.sessionIds.filter((id) => typeof id === 'string'))].slice(0, MAX_SESSIONS);
     const out = {};
@@ -308,7 +310,7 @@ function startMcp(ctx, host, token) {
     const mine = ++generation;
     await stop();
     const secret = await token();
-    if (closed || mine !== generation || !secret) return;
+    if (closed || mine !== generation || !secret || !host()) return;
     try {
       const mcp = await import('@deepseek-ai/dsh-mcp-client');
       if (closed || mine !== generation) return;
