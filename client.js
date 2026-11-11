@@ -27,9 +27,9 @@ window.__ModuleLoader__.load({
     };
 
     const css = `
-.yt-chip{display:inline-flex;align-items:center;gap:4px;flex:none;min-width:0;max-width:150px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary)}
+.yt-chip{display:inline-flex;align-items:center;gap:5px;flex:none;min-width:0;max-width:128px;font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary)}
 .yt-chip-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.yt-prio{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:4px;font-size:10px;font-weight:600;line-height:16px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}
+.yt-dot{flex:none;width:6px;height:6px;box-sizing:border-box;border-radius:50%;background:var(--yt-dot,transparent);border:1px solid var(--yt-ring,transparent)}
 .yt-hover{display:flex;flex-direction:column;gap:4px;min-width:0}
 .yt-hover-row{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;line-height:16px}
 .yt-hover-label{flex:none;width:64px;color:#adb2b8}
@@ -114,13 +114,24 @@ window.__ModuleLoader__.load({
 
     const tint = (value) => (value && value.bg ? { background: value.bg, color: value.fg || '#fff' } : undefined);
 
+    // YouTrack styles values for a light UI; a near-white or near-black fill would glare in the list, so it becomes a ring.
+    function luminance(hex) {
+      const h = hex.replace('#', ''); const f = h.length <= 4 ? h.split('').map((c) => c + c).join('') : h;
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16) / 255);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    const dotStyle = (value) => {
+      if (!value || !value.bg || Number.isNaN(luminance(value.bg)) || luminance(value.bg) > 0.88 || luminance(value.bg) < 0.06) return { '--yt-ring': 'var(--dsw-alias-label-tertiary)' };
+      return { '--yt-dot': value.bg };
+    };
+
     function Row({ store, sessionId }) {
       const issue = useIssue(store, sessionId);
       if (!issue) return null;
       const label = [issue.project.key, issue.state?.name].filter(Boolean).join(' · ');
       return h('span', { className: 'yt-chip', 'data-youtrack-row': issue.key, title: `${issue.key} — ${[issue.state?.name, issue.priority?.name].filter(Boolean).join(', ')}` },
         h('style', null, css),
-        issue.priority && h('span', { className: 'yt-prio', style: tint(issue.priority), 'aria-label': issue.priority.name }, [...issue.priority.name][0]?.toUpperCase()),
+        issue.priority && h('span', { className: 'yt-dot', style: dotStyle(issue.priority), role: 'img', 'aria-label': issue.priority.name }),
         h('span', { className: 'yt-chip-text' }, label));
     }
 
